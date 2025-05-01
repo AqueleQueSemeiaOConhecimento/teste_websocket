@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat WebSocket</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        header { background: #4CAF50; color: #fff; padding: 1rem; text-align: center; }
+        .container { display: flex; height: calc(100vh - 70px); }
+        .sidebar {
+            width: 250px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .sidebar h2 { margin-top: 0; }
+        .sidebar form { margin-bottom: 1rem; }
+        .sidebar input, .sidebar button { width: 100%; padding: 0.5rem; margin: 0.25rem 0; box-sizing: border-box; }
+        .sidebar ul { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; }
+        .sidebar li { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+        .chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .messages {
+            flex: 1;
+            background: #fff;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+        .message { margin-bottom: 0.5rem; }
+        .message .sender { font-weight: bold; margin-right: 0.5rem; }
+        .chat-form { display: flex; }
+        .chat-form input { flex: 1; padding: 0.5rem; }
+        .chat-form button { padding: 0.5rem 1rem; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Chat WebSocket</h1>
+    </header>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Acesso</h2>
+            <form id="loginForm">
+                <input type="text" id="loginUsername" placeholder="Usuário" required>
+                <input type="password" id="loginPassword" placeholder="Senha" required>
+                <button type="submit">Login</button>
+                <button type="button" id="showRegister">Registrar</button>
+            </form>
+
+            <form id="registerForm" class="hidden">
+                <input type="text" id="regUsername" placeholder="Usuário" required>
+                <input type="password" id="regPassword" placeholder="Senha" required>
+                <button type="submit">Registrar</button>
+                <button type="button" id="showLogin">Voltar</button>
+            </form>
+
+            <div id="userSection" class="hidden">
+                <h2>Olá, <span id="currentUser"></span></h2>
+                <button id="logoutBtn">Logout</button>
+                <h2>Solicitar Amizade</h2>
+                <form id="friendForm">
+                    <input type="text" id="friendUsername" placeholder="Nome do amigo" required>
+                    <button type="submit">Enviar Pedido</button>
+                </form>
+                <h2>Pedidos Pendentes</h2>
+                <ul id="pendingList"></ul>
+            </div>
+        </div>
+        <div class="chat">
+            <div class="messages" id="messages"></div>
+            <form class="chat-form hidden" id="chatForm">
+                <input type="text" id="messageInput" placeholder="Digite sua mensagem..." required>
+                <button type="submit">Enviar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <script>
+        let stompClient;
+        let currentUser = localStorage.getItem('chatUser');
+
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const showRegisterBtn = document.getElementById('showRegister');
+        const showLoginBtn = document.getElementById('showLogin');
+        const userSection = document.getElementById('userSection');
+        const chatForm = document.getElementById('chatForm');
+
+        function toggleForms() {
+            const logged = !!currentUser;
+            loginForm.classList.toggle('hidden', logged);
+            registerForm.classList.add('hidden');
+            userSection.classList.toggle('hidden', !logged);
+            chatForm.classList.toggle('hidden', !logged);
+            if (logged) document.getElementById('currentUser').textContent = currentUser;
+        }
+
+        showRegisterBtn.addEventListener('click', () => {
+            loginForm.classList.add('hidden');
+            registerForm.classList.remove('hidden');
+        });
+        showLoginBtn.addEventListener('click', () => {
+            registerForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+        });
+
+        loginForm.addEventListener('submit', e => {
+            e.preventDefault();
+            fetch('/api/users/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: document.getElementById('loginUsername').value,
+                    password: document.getElementById('loginPassword').value
+                })
+            })
+            .then(res => res.ok ? res.json() : Promise.reject('falha login'))
+            .then(user => {
+                currentUser = user.username;
+                localStorage.setItem('chatUser', currentUser);
+                toggleForms();
+                connectWebSocket();
+                loadPending();
+            })
+            .catch(() => alert('Login inválido'));
+        });
+
+        registerForm.addEventListener('submit', e => {
+            e.preventDefault();
+            fetch('/api/users/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: document.getElementById('regUsername').value,
+                    password: document.getElementById('regPassword').value
+                })
+            })
+            .then(res => res.json())
+            .then(user => {
+                alert('Registrado com sucesso! Faça login.');
+                registerForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+            });
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('chatUser');
+            currentUser = null;
+            toggleForms();
+        });
+
+        document.getElementById('friendForm').addEventListener('submit', e => {
+            e.preventDefault();
+            fetch('/api/friends/request', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ senderUsername: currentUser, receiverUsername: document.getElementById('friendUsername').value })
+            }).then(() => loadPending());
+        });
+
+        document.getElementById('chatForm').addEventListener('submit', e => {
+            e.preventDefault();
+            const content = document.getElementById('messageInput').value;
+            stompClient.send('/app/sendMessage', {}, JSON.stringify({ senderUsername: currentUser, content }));
+            document.getElementById('messageInput').value = '';
+        });
+
+        function loadPending() {
+            fetch(`/api/friends/pending/${currentUser}`)
+                .then(res => res.json())
+                .then(list => {
+                    const ul = document.getElementById('pendingList');
+                    ul.innerHTML = '';
+
+                    list.forEach(req => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            ${req.sender.username}
+                            <button data-id="${req.id}" class="accept-btn">Aceitar</button>
+                        `;
+                        ul.appendChild(li);
+                    });
+
+                    document.querySelectorAll('.accept-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const id = btn.getAttribute('data-id');
+                            fetch(`/api/friends/accept/${id}`, {
+                                method: 'POST'
+                            })
+                            .then(res => {
+                                if (res.ok) {
+                                    btn.parentElement.innerHTML = `Pedido de ${btn.parentElement.textContent.trim().split('\n')[0]} aceito.`;
+                                } else {
+                                    alert('Erro ao aceitar o pedido.');
+                                }
+                            });
+                        });
+                    });
+                });
+        }
+
+
+        function connectWebSocket() {
+            const socket = new SockJS('/ws-chat');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, () => {
+                stompClient.subscribe('/topic/messages', msg => {
+                    const chat = JSON.parse(msg.body);
+                    showMessage(chat.sender.username, chat.content);
+                });
+            });
+        }
+
+        function showMessage(sender, content) {
+            const div = document.createElement('div');
+            div.classList.add('message');
+            div.innerHTML = `<span class="sender">${sender}:</span>${content}`;
+            document.getElementById('messages').appendChild(div);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+
+        // Inicialização
+        toggleForms();
+        if (currentUser) { connectWebSocket(); loadPending(); }
+    </script>
+</body>
+</html>
