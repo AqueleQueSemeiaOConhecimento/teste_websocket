@@ -73,6 +73,8 @@
                     <input type="text" id="friendUsername" placeholder="Nome do amigo" required>
                     <button type="submit">Enviar Pedido</button>
                 </form>
+                <h2>Amigos</h2>
+                <ul id="friendsList"></ul>
                 <h2>Pedidos Pendentes</h2>
                 <ul id="pendingList"></ul>
             </div>
@@ -98,6 +100,7 @@
         const showLoginBtn = document.getElementById('showLogin');
         const userSection = document.getElementById('userSection');
         const chatForm = document.getElementById('chatForm');
+        const friendsList = document.getElementById('friendsList');
 
         function toggleForms() {
             const logged = !!currentUser;
@@ -134,6 +137,7 @@
                 toggleForms();
                 connectWebSocket();
                 loadPending();
+                loadFriends();
             })
             .catch(() => alert('Login inválido'));
         });
@@ -171,13 +175,6 @@
             }).then(() => loadPending());
         });
 
-        document.getElementById('chatForm').addEventListener('submit', e => {
-            e.preventDefault();
-            const content = document.getElementById('messageInput').value;
-            stompClient.send('/app/sendMessage', {}, JSON.stringify({ senderUsername: currentUser, content }));
-            document.getElementById('messageInput').value = '';
-        });
-
         function loadPending() {
             fetch(`/api/friends/pending/${currentUser}`)
                 .then(res => res.json())
@@ -203,6 +200,7 @@
                             .then(res => {
                                 if (res.ok) {
                                     btn.parentElement.innerHTML = `Pedido de ${btn.parentElement.textContent.trim().split('\n')[0]} aceito.`;
+                                    loadFriends();
                                 } else {
                                     alert('Erro ao aceitar o pedido.');
                                 }
@@ -212,29 +210,33 @@
                 });
         }
 
+        function loadFriends() {
+            fetch(`/api/friends/get-all-friends/${currentUser}`)
+                .then(res => res.json())
+                .then(friends => {
+                    friendsList.innerHTML = '';
+                    friends.forEach(friend => {
+                        const li = document.createElement('li');
+                        li.textContent = friend.username;
+                        friendsList.appendChild(li);
+                    });
+                });
+        }
 
         function connectWebSocket() {
             const socket = new SockJS('/ws-chat');
             stompClient = Stomp.over(socket);
             stompClient.connect({}, () => {
-                stompClient.subscribe('/topic/messages', msg => {
-                    const chat = JSON.parse(msg.body);
-                    showMessage(chat.sender.username, chat.content);
+                stompClient.subscribe(`/topic/friends/${currentUser}`, (message) => {
+                    if (message.body === 'updated') {
+                        loadFriends();
+                    }
                 });
             });
         }
 
-        function showMessage(sender, content) {
-            const div = document.createElement('div');
-            div.classList.add('message');
-            div.innerHTML = `<span class="sender">${sender}:</span>${content}`;
-            document.getElementById('messages').appendChild(div);
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-        }
-
-        // Inicialização
         toggleForms();
-        if (currentUser) { connectWebSocket(); loadPending(); }
+        if (currentUser) { connectWebSocket(); loadPending(); loadFriends(); }
     </script>
 </body>
 </html>

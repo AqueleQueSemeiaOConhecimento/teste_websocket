@@ -22,8 +22,13 @@ public class UserController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<User> register(@Valid @RequestBody UserDTO dto) {
-        return ResponseEntity.ok(userService.register(dto));
+    public ResponseEntity<?> register(@Valid @RequestBody UserDTO dto) {
+        try {
+            User user = userService.register(dto);
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(400).body("Erro no registro de usuário");
+        }
     }
 
     @PostMapping("/login")

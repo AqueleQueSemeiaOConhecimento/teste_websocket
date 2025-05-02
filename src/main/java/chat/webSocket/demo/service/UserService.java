@@ -7,5 +7,6 @@ import chat.webSocket.demo.model.User;
 
 public interface UserService {
     User register(UserDTO dto);
+    User login(UserDTO dto);
     Optional<User> findByUsername(String username);
 }

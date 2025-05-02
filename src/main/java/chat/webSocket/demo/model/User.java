@@ -6,6 +6,8 @@ import lombok.Setter;
 
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -21,11 +23,15 @@ public class User {
     private String password;
 
     @OneToMany(mappedBy = "sender")
+    @JsonIgnore
     private Set<ChatMessage> mensagensEnviadas;
 
     @OneToMany(mappedBy = "sender")
+    @JsonIgnore
     private Set<FriendRequest> sentRequests;
 
     @OneToMany(mappedBy = "receiver")
+    @JsonIgnore
+    
     private Set<FriendRequest> receivedRequests;
 }
