@@ -27,4 +27,10 @@ public class ChatServiceImpl implements ChatService{
     {
         return repo.findAll();
     }
+
+    public List<ChatMessage> getChatBetweenUsers(Long userId1, Long userId2)
+    {
+        return repo.findBySenderIdAndReceiverIdOrSenderIdAndReceiverIdOrderByTimestamp(
+            userId1, userId2, userId2, userId1);
+    }
 }

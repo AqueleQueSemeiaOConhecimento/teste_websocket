@@ -11,5 +11,8 @@ public class ChatMessageDTO {
     private String senderUsername;
 
     @NotBlank
+    private String receiverUsername;
+
+    @NotBlank
     private String content;
 }

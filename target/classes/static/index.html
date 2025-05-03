@@ -6,42 +6,125 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat WebSocket</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
-        header { background: #4CAF50; color: #fff; padding: 1rem; text-align: center; }
-        .container { display: flex; height: calc(100vh - 70px); }
-        .sidebar {
-            width: 250px;
-            background: #fff;
-            border-right: 1px solid #ddd;
-            padding: 1rem;
-            box-sizing: border-box;
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
         }
-        .sidebar h2 { margin-top: 0; }
-        .sidebar form { margin-bottom: 1rem; }
-        .sidebar input, .sidebar button { width: 100%; padding: 0.5rem; margin: 0.25rem 0; box-sizing: border-box; }
-        .sidebar ul { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; }
-        .sidebar li { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h1 {
+            margin: 0;
+        }
+
+        .container {
+            display: flex;
+            min-height: 80vh;
+            justify-content: space-between;
+        }
+
+        .sidebar {
+            background-color: #fff;
+            width: 25%;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar h2 {
+            margin-top: 0;
+        }
+
         .chat {
+            width: 70%;
+            padding: 20px;
+        }
+
+        .messages {
+            background-color: #fff;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .message {
+            padding: 5px 0;
+            margin-bottom: 10px;
+        }
+
+        .message .sender {
+            font-weight: bold;
+        }
+
+        .chat-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-form input {
             flex: 1;
+            padding: 10px;
+            font-size: 14px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .chat-form button {
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .sidebar button {
+            padding: 10px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .sidebar button:hover {
+            background-color: #444;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        form {
             display: flex;
             flex-direction: column;
-            padding: 1rem;
-            box-sizing: border-box;
         }
-        .messages {
-            flex: 1;
-            background: #fff;
-            padding: 1rem;
-            border: 1px solid #ddd;
-            overflow-y: auto;
-            margin-bottom: 1rem;
+
+        ul {
+            list-style: none;
+            padding: 0;
         }
-        .message { margin-bottom: 0.5rem; }
-        .message .sender { font-weight: bold; margin-right: 0.5rem; }
-        .chat-form { display: flex; }
-        .chat-form input { flex: 1; padding: 0.5rem; }
-        .chat-form button { padding: 0.5rem 1rem; }
-        .hidden { display: none; }
+
+        ul li {
+            padding: 5px 0;
+        }
     </style>
 </head>
 <body>
@@ -50,20 +133,25 @@
     </header>
     <div class="container">
         <div class="sidebar">
-            <h2>Acesso</h2>
-            <form id="loginForm">
-                <input type="text" id="loginUsername" placeholder="Usuário" required>
-                <input type="password" id="loginPassword" placeholder="Senha" required>
-                <button type="submit">Login</button>
-                <button type="button" id="showRegister">Registrar</button>
-            </form>
+            <div id="loginForm" class="form">
+                <h2>Login</h2>
+                <form>
+                    <input type="text" id="loginUsername" placeholder="Nome de usuário" required>
+                    <input type="password" id="loginPassword" placeholder="Senha" required>
+                    <button type="submit">Entrar</button>
+                </form>
+                <button id="showRegister">Não tem uma conta? Registre-se</button>
+            </div>
 
-            <form id="registerForm" class="hidden">
-                <input type="text" id="regUsername" placeholder="Usuário" required>
-                <input type="password" id="regPassword" placeholder="Senha" required>
-                <button type="submit">Registrar</button>
-                <button type="button" id="showLogin">Voltar</button>
-            </form>
+            <div id="registerForm" class="form hidden">
+                <h2>Registrar</h2>
+                <form>
+                    <input type="text" id="regUsername" placeholder="Nome de usuário" required>
+                    <input type="password" id="regPassword" placeholder="Senha" required>
+                    <button type="submit">Registrar</button>
+                </form>
+                <button id="showLogin">Já tem uma conta? Faça login</button>
+            </div>
 
             <div id="userSection" class="hidden">
                 <h2>Olá, <span id="currentUser"></span></h2>
@@ -75,6 +163,7 @@
                 </form>
                 <h2>Amigos</h2>
                 <ul id="friendsList"></ul>
+                <input type="hidden" id="selectedFriend">
                 <h2>Pedidos Pendentes</h2>
                 <ul id="pendingList"></ul>
             </div>
@@ -93,7 +182,6 @@
     <script>
         let stompClient;
         let currentUser = localStorage.getItem('chatUser');
-
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
         const showRegisterBtn = document.getElementById('showRegister');
@@ -181,7 +269,6 @@
                 .then(list => {
                     const ul = document.getElementById('pendingList');
                     ul.innerHTML = '';
-
                     list.forEach(req => {
                         const li = document.createElement('li');
                         li.innerHTML = `
@@ -217,11 +304,59 @@
                     friendsList.innerHTML = '';
                     friends.forEach(friend => {
                         const li = document.createElement('li');
-                        li.textContent = friend.username;
+                        li.innerHTML = `
+                            ${friend.username}
+                            <button class="chat-btn" data-user="${friend.username}">Conversar</button>
+                        `;
                         friendsList.appendChild(li);
+                    });
+
+                    document.querySelectorAll('.chat-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const friendUsername = btn.getAttribute('data-user');
+                            document.getElementById('selectedFriend').value = friendUsername;
+                            document.getElementById('messages').innerHTML = '';
+                            subscribeToChat(friendUsername);
+                        });
                     });
                 });
         }
+
+        let chatSubscription;
+        function subscribeToChat(friendUsername) {
+            if (chatSubscription) chatSubscription.unsubscribe();
+
+            const topicPath = `/topic/messages/${currentUser}/${friendUsername}`;
+            chatSubscription = stompClient.subscribe(topicPath, (message) => {
+                const msg = JSON.parse(message.body);
+                displayMessage(msg.sender.username, msg.content);
+            });
+        }
+
+        function displayMessage(sender, content) {
+            const msgDiv = document.getElementById('messages');
+            const msgEl = document.createElement('div');
+            msgEl.classList.add('message');
+            msgEl.innerHTML = `<span class="sender">${sender}:</span> ${content}`;
+            msgDiv.appendChild(msgEl);
+            msgDiv.scrollTop = msgDiv.scrollHeight;
+        }
+
+        document.getElementById('chatForm').addEventListener('submit', e => {
+            e.preventDefault();
+            const content = document.getElementById('messageInput').value;
+            const receiver = document.getElementById('selectedFriend').value;
+            if (!receiver || !content) return;
+
+            stompClient.send("/api/messages/sendMessage", {}, JSON.stringify({
+                senderUsername: currentUser,
+                receiverUsername: receiver,
+                content: content
+            }));
+
+            displayMessage(currentUser, content); // mostra a própria mensagem também
+            document.getElementById('messageInput').value = '';
+        });
 
         function connectWebSocket() {
             const socket = new SockJS('/ws-chat');
